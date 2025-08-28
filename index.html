@@ -1,8 +1,218 @@
 <!doctype html>
 <html lang="es">
-  <head><meta charset="utf-8"><title>CI/CD funcionando</title></head>
-  <body>
-    <h1>CI/CD funcionando </h1>
-    <p>Si ves este archivo en el server, el deploy por git pull anduvo.</p>
-  </body>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Proy-DevOps — Conversor ARS ⇄ USD</title>
+  <style>
+    :root {
+      --bg: #0f172a;       /* slate-900 */
+      --card: #111827;     /* gray-900 */
+      --muted: #94a3b8;    /* slate-400 */
+      --text: #e5e7eb;     /* gray-200 */
+      --accent: #22c55e;   /* emerald-500 */
+      --danger: #ef4444;   /* red-500 */
+      --border: #1f2937;   /* gray-800 */
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: radial-gradient(1200px 800px at 20% -10%, #1f2937, #0b1222 40%, #060a14 80%);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      color: var(--text); line-height: 1.5; padding: 24px;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    header { margin: 8px 0 24px; }
+    h1 { margin: 0; font-size: clamp(1.4rem, 3vw, 2rem); }
+    .subtitle { color: var(--muted); font-size: .95rem; margin-top: 6px; }
+    .card {
+      background: linear-gradient(180deg, rgba(17,24,39,.9), rgba(12,18,34,.9));
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.3);
+    }
+    .grid {
+      display: grid; gap: 16px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 720px) {
+      .grid { grid-template-columns: 1.2fr .8fr; }
+    }
+    label { display: block; font-size: .95rem; margin-bottom: 6px; color: #cbd5e1; }
+    input, select, button, .output {
+      width: 100%; border-radius: 10px; padding: 12px 14px;
+      border: 1px solid var(--border); background: #0b1222; color: var(--text);
+      font-size: 1rem;
+    }
+    input::placeholder { color: #64748b; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .actions { display: flex; gap: 12px; margin-top: 12px; }
+    button {
+      cursor: pointer; border: 1px solid transparent; font-weight: 600;
+      transition: transform .06s ease, background .2s ease, opacity .2s ease;
+    }
+    .btn-primary { background: var(--accent); color: #052e14; }
+    .btn-secondary { background: #111827; border-color: var(--border); color: var(--text); }
+    button:active { transform: translateY(1px); }
+    .output {
+      min-height: 56px; display: grid; place-items: center; text-align: center;
+      font-size: clamp(1.1rem, 2.6vw, 1.6rem); font-weight: 700; letter-spacing: .2px;
+    }
+    .muted { color: var(--muted); font-size: .9rem; }
+    .error { color: #fecaca; background: #7f1d1d; border-color: #dc2626; padding: 10px 12px; border-radius: 10px; display: none; }
+    footer { margin-top: 24px; color: var(--muted); font-size: .9rem; }
+    .badge {
+      display: inline-block; padding: 4px 10px; border-radius: 999px;
+      border: 1px solid var(--border); background: #0b1222; color: #cbd5e1; font-size: .8rem;
+    }
+    .hint { font-size: .9rem; color: #93c5fd; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Proy-DevOps — Conversor ARS ⇄ USD</h1>
+      <div class="subtitle">Demostración de CI (tests con Jest) + CD (SSH &amp; <code>git pull</code> en el servidor)</div>
+    </header>
+
+    <section class="card">
+      <form id="form">
+        <div class="grid">
+          
+          <div>
+            <div class="row">
+              <div>
+                <label for="direction">Dirección</label>
+                <select id="direction" name="direction" aria-label="Dirección de conversión">
+                  <option value="ARS_TO_USD">ARS → USD</option>
+                  <option value="USD_TO_ARS">USD → ARS</option>
+                </select>
+              </div>
+              <div>
+                <label for="rate">Tipo de cambio (ARS por 1 USD)</label>
+                <input id="rate" name="rate" type="number" step="0.01" min="0" placeholder="Ej: 1250"
+                       autocomplete="off" inputmode="decimal" />
+              </div>
+            </div>
+
+            <div class="row" style="margin-top:12px">
+              <div>
+                <label for="amount">Monto</label>
+                <input id="amount" name="amount" type="number" step="0.01" min="0" placeholder="Ej: 125000"
+                       autocomplete="off" inputmode="decimal" />
+              </div>
+              <div>
+                <label>&nbsp;</label>
+                <div class="actions">
+                  <button class="btn-primary" type="submit">Convertir</button>
+                  <button class="btn-secondary" type="button" id="clear">Limpiar</button>
+                </div>
+              </div>
+            </div>
+
+            <p class="muted" style="margin-top:10px">
+              <span class="badge">Tip</span>
+              Usá este archivo para evidenciar el deploy: cambiá un texto (p. ej. este párrafo), hacé push a <code>main</code> y verificá que en el servidor se actualiza.
+            </p>
+
+            <div id="error" class="error" role="alert"></div>
+          </div>
+
+          
+          <div>
+            <label>Resultado</label>
+            <div id="output" class="output">—</div>
+            <p class="muted">Redondeo a 2 decimales. Validación: números y tipo de cambio &gt; 0.</p>
+            <p class="hint">Dato: podés dejar por defecto 1 USD = 1250 ARS y ajustar cuando quieras.</p>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <footer>
+      <p>CI: ejecuta tests de la función <code>convertirArsAUsd</code> (Jest).&nbsp;
+        CD: al aprobar CI en <code>main</code>, GitHub Actions entra por SSH y hace <code>git pull</code> en <code>~/lemp-sites/&lt;REMOTE_FOLDER&gt;</code>.
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    
+    function convertirArsAUsd(montoArs, tipoCambio) {
+      if (typeof montoArs !== 'number' || typeof tipoCambio !== 'number' || Number.isNaN(montoArs) || Number.isNaN(tipoCambio)) {
+        throw new TypeError('Los argumentos deben ser números');
+      }
+      if (tipoCambio <= 0) throw new RangeError('El tipo de cambio debe ser > 0');
+      return Number((montoArs / tipoCambio).toFixed(2));
+    }
+    function convertirUsdAArs(montoUsd, tipoCambio) {
+      if (typeof montoUsd !== 'number' || typeof tipoCambio !== 'number' || Number.isNaN(montoUsd) || Number.isNaN(tipoCambio)) {
+        throw new TypeError('Los argumentos deben ser números');
+      }
+      if (tipoCambio <= 0) throw new RangeError('El tipo de cambio debe ser > 0');
+      return Number((montoUsd * tipoCambio).toFixed(2));
+    }
+
+    
+    const fmtARS = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 2 });
+    const fmtUSD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+
+    
+    const $form = document.getElementById('form');
+    const $dir = document.getElementById('direction');
+    const $rate = document.getElementById('rate');
+    const $amount = document.getElementById('amount');
+    const $out = document.getElementById('output');
+    const $error = document.getElementById('error');
+    const $clear = document.getElementById('clear');
+
+    
+    $rate.value = '1250';
+    $amount.value = '125000';
+
+    function showError(msg) {
+      $error.textContent = msg;
+      $error.style.display = 'block';
+      $out.textContent = '—';
+    }
+    function clearError() { $error.textContent = ''; $error.style.display = 'none'; }
+
+    $form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      clearError();
+
+      const direction = $dir.value;
+      const rate = Number($rate.value);
+      const amount = Number($amount.value);
+
+      try {
+        if (!Number.isFinite(rate) || !Number.isFinite(amount)) {
+          throw new TypeError('Completá ambos campos con números válidos.');
+        }
+        let result;
+        if (direction === 'ARS_TO_USD') {
+          result = convertirArsAUsd(amount, rate);
+          $out.textContent = `${fmtARS.format(amount)} → ${fmtUSD.format(result)}`;
+        } else {
+          result = convertirUsdAArs(amount, rate);
+          $out.textContent = `${fmtUSD.format(amount)} → ${fmtARS.format(result)}`;
+        }
+      } catch (err) {
+        if (err instanceof RangeError || err instanceof TypeError) {
+          showError(err.message);
+        } else {
+          showError('Ocurrió un error inesperado.');
+          console.error(err);
+        }
+      }
+    });
+
+    $clear.addEventListener('click', () => {
+      $amount.value = '';
+      $out.textContent = '—';
+      clearError();
+      $amount.focus();
+    });
+
+    [$rate, $amount, $dir].forEach(el => el.addEventListener('input', clearError));
+  </script>
+</body>
 </html>
